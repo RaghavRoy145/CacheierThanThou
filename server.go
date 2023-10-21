@@ -12,17 +12,20 @@ import (
 type ServerOpts struct {
 	ListenAddr string
 	IsLeader   bool
+	LeaderAddr string
 }
 
 type Server struct {
 	ServerOpts
-	cache cache.Cacher
+	followers map[net.Conn]struct{}
+	cache     cache.Cacher
 }
 
 func NewServer(opts ServerOpts, c cache.Cacher) *Server {
 	return &Server{
 		ServerOpts: opts,
 		cache:      c,
+		followers:  make(map[net.Conn]struct{}),
 	}
 }
 
@@ -32,7 +35,16 @@ func (s *Server) Start() error {
 		return fmt.Errorf("listen error: %s", err)
 	}
 	log.Printf("server on starting on port [%s]\n", s.ListenAddr)
-
+	if !s.IsLeader {
+		go func() {
+			conn, err := net.Dial("tcp", s.LeaderAddr)
+			fmt.Println("connected with leader:", s.LeaderAddr)
+			if err != nil {
+				log.Fatal(err)
+			}
+			s.handleConn(conn)
+		}()
+	}
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
@@ -44,10 +56,9 @@ func (s *Server) Start() error {
 }
 
 func (s *Server) handleConn(conn net.Conn) {
-	defer func() {
-		conn.Close()
-	}()
+	defer conn.Close()
 	buf := make([]byte, 2048)
+	fmt.Println("connection made:", conn.RemoteAddr())
 	for {
 		n, err := conn.Read(buf)
 		if err != nil {
@@ -65,7 +76,7 @@ func (s *Server) handleCommand(conn net.Conn, rawCmd []byte) {
 		conn.Write([]byte(err.Error()))
 		return
 	}
-
+	fmt.Printf("received command %s\n", msg.Cmd)
 	switch msg.Cmd {
 	case CMDSet:
 		err = s.handleSetCmd(conn, msg)
@@ -102,5 +113,12 @@ func (s *Server) handleGetCmd(conn net.Conn, msg *Message) error {
 }
 
 func (s *Server) sendToFollowers(ctx context.Context, msg *Message) error {
+	for conn := range s.followers {
+		_, err := conn.Write(msg.ToBytes())
+		if err != nil {
+			fmt.Println("write to follower error:", err)
+			continue
+		}
+	}
 	return nil
 }
