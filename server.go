@@ -114,7 +114,10 @@ func (s *Server) handleGetCmd(conn net.Conn, msg *Message) error {
 
 func (s *Server) sendToFollowers(ctx context.Context, msg *Message) error {
 	for conn := range s.followers {
-		_, err := conn.Write(msg.ToBytes())
+		fmt.Println("forwarding key to follower")
+		rawMsg := msg.ToBytes()
+		fmt.Println("forwarding rawMsg to follower:", string(rawMsg))
+		_, err := conn.Write(rawMsg)
 		if err != nil {
 			fmt.Println("write to follower error:", err)
 			continue
