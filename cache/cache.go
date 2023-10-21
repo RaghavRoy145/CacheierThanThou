@@ -2,6 +2,7 @@ package cache
 
 import (
 	"fmt"
+	"log"
 	"sync"
 	"time"
 )
@@ -43,14 +44,21 @@ func (c *Cache) Get(key []byte) ([]byte, error) {
 		return nil, fmt.Errorf("key (%s) not found", string(key))
 	}
 
+	log.Printf("GET %s = %s\n", string(key), string(val))
+
 	return val, nil
 }
 
 func (c *Cache) Set(key, value []byte, ttl time.Duration) error {
 	c.lock.Lock()
 	defer c.lock.Unlock()
-
 	c.data[string(key)] = value
+	log.Printf("SET %s to %s\n", string(key), string(value))
+	//cool stuff
+	go func() {
+		<-time.After(ttl)
+		delete(c.data, string(key))
+	}()
 
 	return nil
 }
