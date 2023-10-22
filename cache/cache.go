@@ -54,6 +54,7 @@ func (c *Cache) Set(key, value []byte, ttl time.Duration) error {
 	defer c.lock.Unlock()
 	c.data[string(key)] = value
 	log.Printf("SET %s to %s\n", string(key), string(value))
+
 	//cool stuff
 	go func() {
 		<-time.After(ttl)
