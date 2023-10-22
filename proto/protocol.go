@@ -1,8 +1,9 @@
-package main
+package proto
 
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"io"
 )
 
@@ -109,17 +110,18 @@ func (c *CommandGet) Bytes() []byte {
 	return buf.Bytes()
 }
 
-func ParseCommand(r io.Reader) any {
+func ParseCommand(r io.Reader) (any, error) {
 	var cmd Command
-	binary.Read(r, binary.LittleEndian, &cmd)
-
+	if err := binary.Read(r, binary.LittleEndian, &cmd); err != nil {
+		return nil, err
+	}
 	switch cmd {
 	case CmdSet:
-		return parseSetCommand(r)
+		return parseSetCommand(r), nil
 	case CmdGet:
-		return parseGetCommand(r)
+		return parseGetCommand(r), nil
 	default:
-		panic("invalid command")
+		return nil, fmt.Errorf("invalid command")
 	}
 }
 
@@ -133,12 +135,13 @@ func parseSetCommand(r io.Reader) *CommandSet {
 
 	var valueLen int32
 	binary.Read(r, binary.LittleEndian, &valueLen)
-	cmd.Key = make([]byte, valueLen)
+	cmd.Value = make([]byte, valueLen)
 	binary.Read(r, binary.LittleEndian, &cmd.Value)
 
 	var ttl int32
 	binary.Read(r, binary.LittleEndian, &ttl)
 	cmd.TTL = int(ttl)
+
 	return cmd
 }
 
