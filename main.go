@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"time"
 
@@ -29,21 +30,24 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		for i := 0; i < 10; i++ {
-			SendCommand(client)
-			time.Sleep(time.Millisecond * 200)
+		err = client.Set(context.Background(), []byte("foo"), []byte("bar"), 0)
+		if err != nil {
+			log.Fatal(err)
 		}
+		value, err := client.Get(context.Background(), []byte("foo"))
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println(string(value))
 		client.Close()
-		time.Sleep(time.Second * 1)
+		// for i := 0; i < 10; i++ {
+		// 	SendCommand(client)
+		// 	time.Sleep(time.Millisecond * 200)
+		// }
+		// client.Close()
+		// time.Sleep(time.Second * 1)
 	}()
 
 	server := NewServer(opts, cache.New())
 	server.Start()
-}
-
-func SendCommand(c *client.Client) {
-	_, err := c.Set(context.Background(), []byte("Roy"), []byte("Boi"), 0)
-	if err != nil {
-		log.Fatal(err)
-	}
 }

@@ -69,10 +69,39 @@ func (s *Server) handleCommand(conn net.Conn, cmd any) {
 	case *proto.CommandSet:
 		s.handleSetCommand(conn, v)
 	case *proto.CommandGet:
+		s.handleGetCommand(conn, v)
 	}
+}
+
+func (s *Server) handleGetCommand(conn net.Conn, cmd *proto.CommandGet) error {
+	log.Printf("GET %s", cmd.Key)
+
+	resp := proto.ResponseGet{}
+	value, err := s.cache.Get(cmd.Key)
+	if err != nil {
+		resp.Status = proto.StatusError
+		_, err := conn.Write(resp.Bytes())
+		return err
+	}
+	resp.Status = proto.StatusOk
+	resp.Value = value
+	_, err = conn.Write(resp.Bytes())
+	return err
 }
 
 func (s *Server) handleSetCommand(conn net.Conn, cmd *proto.CommandSet) error {
 	log.Printf("SET %s to %s", cmd.Key, cmd.Value)
-	return s.cache.Set(cmd.Key, cmd.Value, time.Duration(cmd.TTL))
+	resp := proto.ResponseSet{}
+	if err := s.cache.Set(cmd.Key, cmd.Value, time.Duration(cmd.TTL)); err != nil {
+		resp.Status = proto.StatusError
+		_, err := conn.Write(resp.Bytes())
+		return err
+	}
+	resp.Status = proto.StatusOk
+	_, err := conn.Write(resp.Bytes())
+	return err
 }
+
+// func respondClient(conn net.Conn, msg any) error {
+// 	// _, err := conn.Write(msg.Bytes())
+// }
