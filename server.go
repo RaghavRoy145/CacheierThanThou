@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"log"
@@ -8,6 +10,7 @@ import (
 	"time"
 
 	"github.com/raghavroy145/DistributedCaching/cache"
+	"github.com/raghavroy145/DistributedCaching/client"
 	"github.com/raghavroy145/DistributedCaching/proto"
 )
 
@@ -16,16 +19,17 @@ type ServerOpts struct {
 	IsLeader   bool
 	LeaderAddr string
 }
-
 type Server struct {
 	ServerOpts
-	cache cache.Cacher
+	members map[client.Client]struct{} //Why map? Because O(1)
+	cache   cache.Cacher
 }
 
 func NewServer(opts ServerOpts, c cache.Cacher) *Server {
 	return &Server{
 		ServerOpts: opts,
 		cache:      c,
+		members:    make(map[client.Client]struct{}),
 	}
 }
 
@@ -33,6 +37,14 @@ func (s *Server) Start() error {
 	ln, err := net.Listen("tcp", s.ListenAddr)
 	if err != nil {
 		return fmt.Errorf("listen error: %s", err)
+	}
+
+	if !s.IsLeader && len(s.LeaderAddr) != 0 {
+		go func() {
+			if err := s.dialLeader(); err != nil {
+				log.Println(err)
+			}
+		}()
 	}
 	log.Printf("server on starting on port [%s]\n", s.ListenAddr)
 	for {
@@ -70,7 +82,15 @@ func (s *Server) handleCommand(conn net.Conn, cmd any) {
 		s.handleSetCommand(conn, v)
 	case *proto.CommandGet:
 		s.handleGetCommand(conn, v)
+	case *proto.CommandJoin:
+		s.handleJoinCommand(conn, v)
 	}
+}
+
+func (s *Server) handleJoinCommand(conn net.Conn, cmd *proto.CommandJoin) error {
+	fmt.Println("member just joined the cluster: ", conn.RemoteAddr())
+	s.members[*client.NewFromConn(conn)] = struct{}{}
+	return nil
 }
 
 func (s *Server) handleGetCommand(conn net.Conn, cmd *proto.CommandGet) error {
@@ -90,7 +110,17 @@ func (s *Server) handleGetCommand(conn net.Conn, cmd *proto.CommandGet) error {
 }
 
 func (s *Server) handleSetCommand(conn net.Conn, cmd *proto.CommandSet) error {
-	// log.Printf("SET %s to %s", cmd.Key, cmd.Value)
+	log.Printf("SET %s to %s", cmd.Key, cmd.Value)
+	go func() {
+		//risky here
+		for member := range s.members {
+			err := member.Set(context.TODO(), cmd.Key, cmd.Value, cmd.TTL)
+			if err != nil {
+				log.Println("forward to member failed with: ", err)
+			}
+		}
+	}()
+
 	resp := proto.ResponseSet{}
 	if err := s.cache.Set(cmd.Key, cmd.Value, time.Duration(cmd.TTL)); err != nil {
 		resp.Status = proto.StatusError
@@ -100,6 +130,18 @@ func (s *Server) handleSetCommand(conn net.Conn, cmd *proto.CommandSet) error {
 	resp.Status = proto.StatusOk
 	_, err := conn.Write(resp.Bytes())
 	return err
+}
+
+func (s *Server) dialLeader() error {
+	conn, err := net.Dial("tcp", s.LeaderAddr)
+	if err != nil {
+		return fmt.Errorf("failed to dial leader: [%s]", s.LeaderAddr)
+	}
+
+	log.Println("connected to leader:", s.LeaderAddr)
+	binary.Write(conn, binary.LittleEndian, proto.CmdJoin)
+	s.handleConn(conn)
+	return nil
 }
 
 // func respondClient(conn net.Conn, msg any) error {

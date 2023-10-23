@@ -24,8 +24,10 @@ func main() {
 		LeaderAddr: *leaderAddr,
 	}
 	go func() {
-		time.Sleep(time.Second * 2)
-		SendStuff()
+		time.Sleep(time.Second * 5)
+		if opts.IsLeader {
+			SendStuff()
+		}
 	}()
 
 	server := NewServer(opts, cache.New())
@@ -33,7 +35,7 @@ func main() {
 }
 
 func SendStuff() {
-	for i := 0; i < 2000; i++ {
+	for i := 0; i < 200; i++ {
 		go func(i int) {
 			client, err := client.New(":3000", client.Options{})
 			if err != nil {

@@ -24,6 +24,13 @@ func New(endPoint string, opts Options) (*Client, error) {
 		conn: conn,
 	}, nil
 }
+
+func NewFromConn(conn net.Conn) *Client {
+	return &Client{
+		conn: conn,
+	}
+}
+
 func (c *Client) Get(ctx context.Context, key []byte) ([]byte, error) {
 	cmd := &proto.CommandGet{
 		Key: key,
