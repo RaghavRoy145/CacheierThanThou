@@ -58,7 +58,7 @@ func (c *Client) Set(ctx context.Context, key []byte, value []byte, ttl int) err
 	if err != nil {
 		return err
 	}
-	fmt.Printf("%+v\n", resp)
+	// fmt.Printf("%+v\n", resp)
 	if resp.Status != proto.StatusOk {
 		return fmt.Errorf("server responded with non OK status [%s]", resp.Status)
 	}
