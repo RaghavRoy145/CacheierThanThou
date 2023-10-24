@@ -47,8 +47,7 @@ func SendStuff() {
 				value = []byte(fmt.Sprintf("val_%d", i))
 			)
 
-			err = client.Set(context.Background(), key, value, 0)
-			if err != nil {
+			if err := client.Set(context.Background(), key, value, 0); err != nil {
 				log.Fatal(err)
 			}
 
