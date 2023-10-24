@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"net"
 	"os"
 	"time"
 
@@ -27,23 +26,43 @@ func main() {
 		// logOutout     = new(bytes.Buffer)
 	)
 	cfg.LocalID = "royboi"
-	// copied from hashicorp raft test code
-	ips, err := net.LookupIP("localhost")
+
+	// mostly black box for me here lol, no clue why it works -> need to apply this to my server
+	tr, err := raft.NewTCPTransport("127.0.0.1:4000", nil, 10, timeout, os.Stdout)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("TCP net failed: ", err)
 	}
-	if len(ips) == 0 {
-		log.Fatal("localhost did not resolve to any IPs")
+
+	// could be a loop, sherlock
+	server := raft.Server{
+		Suffrage: raft.Voter,
+		ID:       raft.ServerID(cfg.LocalID),
+		Address:  raft.ServerAddress("127.0.0.1:4000"),
 	}
-	addr := &net.TCPAddr{IP: ips[0], Port: 4000}
-	tr, err := raft.NewTCPTransport(":4000", addr, 10, timeout, os.Stdout)
-	if err != nil {
-		log.Fatal("TCP net failed", err)
+
+	server2 := raft.Server{
+		Suffrage: raft.Voter,
+		ID:       raft.ServerID("FOOBAR"),
+		Address:  raft.ServerAddress("127.0.0.1:4001"),
 	}
+
+	server3 := raft.Server{
+		Suffrage: raft.Voter,
+		ID:       raft.ServerID("BARFOO"),
+		Address:  raft.ServerAddress("127.0.0.1:4002"),
+	}
+	serverConfig := raft.Configuration{
+		Servers: []raft.Server{server, server2, server3},
+	}
+
 	r, err := raft.NewRaft(cfg, fsm, stableStore, logStore, snapShotStore, tr)
 	if err != nil {
 		log.Fatal("Failed to create new raft: ", err)
 	}
+
+	r.BootstrapCluster(serverConfig)
+	// raft.BootstrapCluster(cfg, logStore, logStore, snapShotStore, tr, serverConfig)
+
 	fmt.Printf("%+v\n", r)
 	select {}
 }
