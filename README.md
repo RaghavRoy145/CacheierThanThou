@@ -12,7 +12,7 @@
 * For followers, to set leader address (```make runfollower``` implicitly sets this to :3000) use the "leaderaddr" flag
 
 ## TODO
-* Currently, Raft consensus is only being implemented using mock clients (that can't dial each other)
+* Currently, Raft consensus is only being implemented using mock servers (that can't dial each other)
 * To run this: ```go run client/runtest/main.go```
 * Need to apply this to the current server/client set up to make it real world
 * Issue open, feel free to contribute
