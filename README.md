@@ -8,6 +8,8 @@
 * ```make run``` to start the leader server
 * ```make runfollower``` to start follower nodes
 * The main func runs a SET and GET from a client, this is just to see how it works
+* To set listener address (```make runfollower``` implicitly sets this to :4000 and ```make run``` sets it to :3000) use the "listenaddr" flag
+* For followers, to set leader address (```make runfollower``` implicitly sets this to :3000) use the "leaderaddr" flag
 
 ## TODO
 * Currently, Raft consensus is only being implemented using mock clients (that can't dial each other)
